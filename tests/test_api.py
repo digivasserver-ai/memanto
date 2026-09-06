@@ -59,7 +59,9 @@ def test_env_setup():
 async def client():
     """Create an async client for testing the FastAPI app"""
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+    # Loopback base URL: UI management routes require a loopback Host header
+    # (DNS-rebinding guard). Tests exercising attacker Hosts set headers per-request.
+    async with AsyncClient(transport=transport, base_url="http://127.0.0.1") as ac:
         yield ac
 
 

@@ -3,6 +3,7 @@
 import asyncio
 from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 
@@ -166,7 +167,7 @@ class TestLoopbackDetection:
 
         mock_request = MagicMock()
         mock_request.client.host = "127.0.0.1"
-        mock_request.headers = {}
+        mock_request.headers = {"host": "127.0.0.1"}
         asyncio.run(_require_local(mock_request))  # must not raise
 
     def test_require_local_allows_ipv4_mapped_loopback(self):
@@ -175,5 +176,18 @@ class TestLoopbackDetection:
 
         mock_request = MagicMock()
         mock_request.client.host = "::ffff:127.0.0.1"
-        mock_request.headers = {}
+        mock_request.headers = {"host": "127.0.0.1"}
         asyncio.run(_require_local(mock_request))  # must not raise
+
+    def test_require_local_rejects_rebinding_host(self):
+        """_require_local must reject a loopback peer with an attacker Host (DNS rebinding)."""
+        from fastapi import HTTPException
+
+        from memanto.app.ui.routes.ui_router import _require_local
+
+        mock_request = MagicMock()
+        mock_request.client.host = "127.0.0.1"
+        mock_request.headers = {"host": "attacker.example"}
+        with pytest.raises(HTTPException) as exc:
+            asyncio.run(_require_local(mock_request))
+        assert exc.value.status_code == 403
